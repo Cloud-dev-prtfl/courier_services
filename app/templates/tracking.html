@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Track Order</h2>
+<form id="trackingForm">
+    <input type="text" id="trackingIdInput" placeholder="Enter Tracking ID (e.g., BRZ-XXXXXXXX)" required>
+    <span id="trackingError" class="error"></span>
+    <button type="submit">Track Order</button>
+</form>
+
+<div id="trackingResult" style="display: none; margin-top: 20px; padding: 20px; border: 1px solid #ccc; background: #f9f9f9;">
+    <h3>Status: <span id="trackStatus"></span></h3>
+    <p><strong>Tracking ID:</strong> <span id="trackIdDisplay"></span></p>
+    <p><strong>ETA:</strong> <span id="trackETA"></span></p>
+    <p><strong>Last Updated:</strong> <span id="trackLastUpdated"></span></p>
+
+    <h4>History</h4>
+    <ul id="trackHistory"></ul>
+
+    <!-- Placeholder for map visualization -->
+    <div style="height: 200px; background: #eee; border: 1px dashed #999; display: flex; align-items: center; justify-content: center; margin-top: 20px;">
+        Map Visualization Area (Future Planning)
+    </div>
+</div>
+
+<script>
+    document.getElementById('trackingForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const trackingId = document.getElementById('trackingIdInput').value;
+        const errSpan = document.getElementById('trackingError');
+
+        // Client-side validation
+        if (!/^BRZ-[A-Z0-9]{8}$/.test(trackingId)) {
+            errSpan.textContent = "Invalid Tracking ID format or ID not found";
+            document.getElementById('trackingResult').style.display = 'none';
+            return;
+        } else {
+            errSpan.textContent = "";
+        }
+
+        try {
+            const res = await fetch(`/api/tracking/${trackingId}`);
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('trackingResult').style.display = 'block';
+                document.getElementById('trackStatus').textContent = data.status;
+                document.getElementById('trackIdDisplay').textContent = data.tracking_id;
+                document.getElementById('trackETA').textContent = data.eta;
+                document.getElementById('trackLastUpdated').textContent = new Date(data.last_updated).toLocaleString();
+
+                const histUl = document.getElementById('trackHistory');
+                histUl.innerHTML = '';
+                data.historical_activity.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = `${item.status} at ${new Date(item.time).toLocaleString()}`;
+                    histUl.appendChild(li);
+                });
+            } else {
+                errSpan.textContent = "Invalid Tracking ID format or ID not found";
+                document.getElementById('trackingResult').style.display = 'none';
+            }
+        } catch (err) {
+            errSpan.textContent = "Connection error";
+        }
+    });
+
+    // Auto-fill and submit if ID passed in query param
+    const urlParams = new URLSearchParams(window.location.search);
+    const trackIdFromQuery = urlParams.get('id');
+    if (trackIdFromQuery) {
+        document.getElementById('trackingIdInput').value = trackIdFromQuery;
+        document.getElementById('trackingForm').dispatchEvent(new Event('submit'));
+    }
+</script>
+{% endblock %}

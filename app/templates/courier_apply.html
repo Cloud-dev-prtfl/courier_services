@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Become a Courier</h2>
+<form id="courierApplyForm" enctype="multipart/form-data">
+    <input type="text" name="full_name" placeholder="Full Legal Name" required>
+    <label>Date of Birth</label>
+    <input type="date" name="dob" id="dobInput" required>
+    <span id="dobError" class="error"></span>
+
+    <input type="text" name="phone" placeholder="Phone Number" required>
+    <input type="email" name="email" placeholder="Email Address" required>
+    <input type="text" name="city" placeholder="Current City" required>
+
+    <select name="vehicle_type" required>
+        <option value="" disabled selected>Select Vehicle Type</option>
+        <option value="Bike/Scooter">Bike/Scooter</option>
+        <option value="Car">Car</option>
+        <option value="Van">Van</option>
+    </select>
+
+    <input type="text" name="vehicle_registration" placeholder="Vehicle Registration Number" required>
+
+    <label>Proof of Identity Upload (PDF/JPG/PNG, max 5MB)</label>
+    <input type="file" name="proof_of_identity" accept=".pdf, .jpg, .jpeg, .png" id="fileInput" required>
+    <span id="fileError" class="error"></span>
+
+    <div>
+        <input type="checkbox" name="consent" id="consentCheck" style="width: auto;" required>
+        <label for="consentCheck">I consent to background checks and agree to the terms of service.</label>
+    </div>
+
+    <button type="submit" id="submitCourierBtn">Submit Application</button>
+</form>
+
+<script>
+    const form = document.getElementById('courierApplyForm');
+    const fileInput = document.getElementById('fileInput');
+    const submitBtn = document.getElementById('submitCourierBtn');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // Age validation
+        const dob = new Date(document.getElementById('dobInput').value);
+        const ageDifMs = Date.now() - dob.getTime();
+        const ageDate = new Date(ageDifMs);
+        const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+        if (age < 18) {
+            document.getElementById('dobError').textContent = 'You must be at least 18 years old.';
+            return;
+        } else {
+            document.getElementById('dobError').textContent = '';
+        }
+
+        // File validation
+        const file = fileInput.files[0];
+        if (file && file.size > 5 * 1024 * 1024) {
+            document.getElementById('fileError').textContent = 'File size exceeds 5MB limit.';
+            return;
+        } else {
+            document.getElementById('fileError').textContent = '';
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Uploading...';
+
+        const formData = new FormData(form);
+        formData.append('consent', true); // Checkbox adds "on", endpoint expects boolean
+
+        try {
+            const res = await fetch('/api/forms/courier/apply', {
+                method: 'POST',
+                body: formData
+            });
+            if (res.ok) {
+                alert('Application submitted successfully');
+                form.reset();
+            } else {
+                const err = await res.json();
+                alert(`Error: ${err.detail}`);
+            }
+        } catch(err) {
+            alert('Submission failed.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Application';
+        }
+    });
+</script>
+{% endblock %}
