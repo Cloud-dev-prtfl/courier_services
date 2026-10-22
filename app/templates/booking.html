@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Start Your Delivery</h2>
+<div id="bookingNotification" style="display:none; background: #ffcc00; padding: 10px; margin-bottom: 15px; font-weight: bold;"></div>
+
+<form id="bookingForm">
+    <!-- Services -->
+    <h3>Select Service</h3>
+    <div id="serviceSelection" style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <!-- Filled by JS -->
+    </div>
+
+    <!-- Addresses -->
+    <h3>Addresses</h3>
+    <div style="display: flex; gap: 20px;">
+        <div style="flex: 1;">
+            <h4>Pickup</h4>
+            <input type="text" id="pickupAddr1" placeholder="Address Line 1" required>
+            <input type="text" id="pickupCity" placeholder="City" required>
+            <input type="text" id="pickupState" placeholder="State" required>
+            <input type="text" id="pickupPin" placeholder="Pin Code" required>
+            <input type="hidden" id="pickupLat" value="18.5204">
+            <input type="hidden" id="pickupLng" value="73.8567">
+        </div>
+        <div style="flex: 1;">
+            <h4>Drop-off</h4>
+            <input type="text" id="dropoffAddr1" placeholder="Address Line 1" required>
+            <input type="text" id="dropoffCity" placeholder="City" required>
+            <input type="text" id="dropoffState" placeholder="State" required>
+            <input type="text" id="dropoffPin" placeholder="Pin Code" required>
+            <input type="hidden" id="dropoffLat" value="18.5204">
+            <input type="hidden" id="dropoffLng" value="73.8567">
+        </div>
+    </div>
+
+    <!-- Package Details -->
+    <h3>Package Details</h3>
+    <input type="number" id="pkgWeight" placeholder="Weight (kg) - Max 25kg" min="0.1" max="25" step="0.1" required>
+    <span id="weightError" class="error"></span>
+
+    <div style="display: flex; gap: 10px;">
+        <input type="number" id="pkgLength" placeholder="Length (cm)" min="1" required>
+        <input type="number" id="pkgWidth" placeholder="Width (cm)" min="1" required>
+        <input type="number" id="pkgHeight" placeholder="Height (cm)" min="1" required>
+    </div>
+
+    <!-- Item Type -->
+    <h3>Item Category</h3>
+    <select id="itemType" required>
+        <option value="Food & Groceries">Food & Groceries</option>
+        <option value="Pharmaceuticals">Pharmaceuticals</option>
+        <option value="E-commerce & retail">E-commerce & retail</option>
+        <option value="Electronics">Electronics</option>
+        <option value="Office supplies">Office supplies</option>
+        <option value="Flowers & gifts">Flowers & gifts</option>
+        <option value="Prohibited">Hazardous Materials (Prohibited)</option>
+    </select>
+
+    <!-- Recipient Info (Step 2 logic handled inline for simplicity) -->
+    <h3>Recipient Info</h3>
+    <input type="text" id="recipientName" placeholder="Recipient Name" required>
+    <input type="text" id="recipientPhone" placeholder="Recipient Phone (10 digits)" required pattern="^\d{10}$">
+
+    <!-- Cost Estimate -->
+    <div style="margin: 20px 0; padding: 15px; border: 1px solid #ccc; background: #f9f9f9;">
+        <h3>Cost Estimate</h3>
+        <div id="costCalculationState">Fill out details to see cost...</div>
+        <div id="costEstimateResult" style="display:none;">
+            <p>Service Fee: ₹ <span id="calcServiceFee"></span></p>
+            <p>Taxes: ₹ <span id="calcTaxes"></span></p>
+            <h4>Total: ₹ <span id="calcTotal"></span></h4>
+        </div>
+    </div>
+
+    <button type="submit" id="confirmOrderBtn" style="background: #28a745; color: white; font-size: 1.2em;">Confirm and Pay</button>
+</form>
+
+<script>
+    let currentService = 'Scheduled';
+    let timeout = null;
+
+    // Load services
+    async function loadServices() {
+        const res = await fetch('/api/booking/services');
+        const services = await res.json();
+        const container = document.getElementById('serviceSelection');
+
+        for (const [name, details] of Object.entries(services)) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.innerHTML = `<strong>${name}</strong><br><small>ETA: ${details.eta}</small>`;
+            btn.style.flex = "1";
+            btn.style.border = "1px solid #ccc";
+            btn.style.background = name === currentService ? "#e0f7fa" : "white";
+            btn.onclick = () => {
+                currentService = name;
+                Array.from(container.children).forEach(c => c.style.background = 'white');
+                btn.style.background = "#e0f7fa";
+                triggerCostCalc();
+            };
+            container.appendChild(btn);
+        }
+    }
+    loadServices();
+
+    // Trigger cost calculation on input change
+    const inputsToWatch = ['pkgWeight', 'pickupAddr1', 'dropoffAddr1'];
+    inputsToWatch.forEach(id => {
+        document.getElementById(id).addEventListener('input', triggerCostCalc);
+    });
+
+    document.getElementById('pkgWeight').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        const err = document.getElementById('weightError');
+        if (val > 25) {
+            err.textContent = "Weight exceeds standard courier limit";
+            document.getElementById('confirmOrderBtn').disabled = true;
+        } else {
+            err.textContent = "";
+            document.getElementById('confirmOrderBtn').disabled = false;
+        }
+    });
+
+    document.getElementById('itemType').addEventListener('change', (e) => {
+        const notif = document.getElementById('bookingNotification');
+        if (e.target.value === 'Prohibited') {
+            notif.textContent = "Warning: This item category is prohibited. Please change your selection.";
+            notif.style.display = "block";
+            document.getElementById('confirmOrderBtn').disabled = true;
+        } else {
+            notif.style.display = "none";
+            document.getElementById('confirmOrderBtn').disabled = false;
+        }
+    });
+
+    function triggerCostCalc() {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(calculateCost, 500);
+    }
+
+    async function calculateCost() {
+        const weight = document.getElementById('pkgWeight').value || 1;
+
+        document.getElementById('costCalculationState').style.display = 'block';
+        document.getElementById('costCalculationState').textContent = 'Calculating...';
+        document.getElementById('costEstimateResult').style.display = 'none';
+
+        const payload = {
+            pickup_address: { address_line_1: "a", city: "c", state: "s", pin_code: "p", latitude: 0.0, longitude: 0.0 },
+            dropoff_address: { address_line_1: "a", city: "c", state: "s", pin_code: "p", latitude: 0.0, longitude: 0.0 },
+            package: { weight: parseFloat(weight), length: 10, width: 10, height: 10 },
+            item_type: "Food & Groceries",
+            service_type: currentService,
+            recipient_name: "Test",
+            recipient_phone: "1234567890"
+        };
+
+        try {
+            const res = await fetch('/api/booking/calculate-cost', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            document.getElementById('costCalculationState').style.display = 'none';
+            document.getElementById('costEstimateResult').style.display = 'block';
+
+            document.getElementById('calcServiceFee').textContent = data.service_fee.toFixed(2);
+            document.getElementById('calcTaxes').textContent = data.taxes.toFixed(2);
+            document.getElementById('calcTotal').textContent = data.total.toFixed(2);
+        } catch (e) {
+            document.getElementById('costCalculationState').textContent = 'Error calculating cost.';
+        }
+    }
+
+    document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const payload = {
+            pickup_address: {
+                address_line_1: document.getElementById('pickupAddr1').value,
+                city: document.getElementById('pickupCity').value,
+                state: document.getElementById('pickupState').value,
+                pin_code: document.getElementById('pickupPin').value,
+                latitude: parseFloat(document.getElementById('pickupLat').value),
+                longitude: parseFloat(document.getElementById('pickupLng').value)
+            },
+            dropoff_address: {
+                address_line_1: document.getElementById('dropoffAddr1').value,
+                city: document.getElementById('dropoffCity').value,
+                state: document.getElementById('dropoffState').value,
+                pin_code: document.getElementById('dropoffPin').value,
+                latitude: parseFloat(document.getElementById('dropoffLat').value),
+                longitude: parseFloat(document.getElementById('dropoffLng').value)
+            },
+            package: {
+                weight: parseFloat(document.getElementById('pkgWeight').value),
+                length: parseFloat(document.getElementById('pkgLength').value),
+                width: parseFloat(document.getElementById('pkgWidth').value),
+                height: parseFloat(document.getElementById('pkgHeight').value)
+            },
+            item_type: document.getElementById('itemType').value,
+            service_type: currentService,
+            recipient_name: document.getElementById('recipientName').value,
+            recipient_phone: document.getElementById('recipientPhone').value
+        };
+
+        try {
+            const res = await fetch('/api/booking/orders', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`Order created successfully! Tracking ID: ${data.order_id}`);
+                window.location.href = `/tracking?id=${data.order_id}`;
+            } else {
+                alert(`Error: ${JSON.stringify(data.detail)}`);
+            }
+        } catch(err) {
+            alert('Failed to place order.');
+        }
+    });
+
+</script>
+{% endblock %}

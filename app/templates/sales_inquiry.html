@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Contact Sales</h2>
+<div id="salesSuccess" style="display:none; background: #d4edda; color: #155724; padding: 15px; margin-bottom: 20px;">
+    Thank you, we will contact you shortly
+</div>
+<form id="salesForm">
+    <input type="text" id="salesBusinessName" placeholder="Business Name" required>
+    <input type="text" id="salesContactName" placeholder="Contact Person Full Name" required>
+    <input type="email" id="salesEmail" placeholder="Business Email" required>
+    <input type="text" id="salesPhone" placeholder="Phone Number (10 digits)" required pattern="^\d{10}$">
+    <span id="salesPhoneError" class="error"></span>
+
+    <textarea id="salesNeeds" placeholder="Describe your specific delivery needs (50-500 chars)" minlength="50" maxlength="500" rows="5" required></textarea>
+    <span id="salesNeedsError" class="error"></span>
+
+    <button type="submit" id="salesSubmitBtn">Submit Inquiry</button>
+</form>
+
+<script>
+    document.getElementById('salesForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const payload = {
+            business_name: document.getElementById('salesBusinessName').value,
+            contact_person: document.getElementById('salesContactName').value,
+            email: document.getElementById('salesEmail').value,
+            phone: document.getElementById('salesPhone').value,
+            needs_description: document.getElementById('salesNeeds').value
+        };
+
+        try {
+            const res = await fetch('/api/forms/sales/inquiry', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                document.getElementById('salesSuccess').style.display = 'block';
+                document.getElementById('salesForm').reset();
+            } else {
+                const err = await res.json();
+                alert(`Error: ${JSON.stringify(err.detail)}`);
+            }
+        } catch(err) {
+            alert('Submission failed.');
+        }
+    });
+</script>
+{% endblock %}

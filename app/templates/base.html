@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=3.2">
+    <title>Courier Services Web Application</title>
+    <!-- Basic styles for scaffolding -->
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 0; }
+        header { background: #333; color: #fff; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
+        header a { color: #fff; text-decoration: none; margin-left: 15px; }
+        .container { padding: 20px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .error { color: red; font-size: 0.9em; display: block; margin-top: 5px; }
+        input, select, button, textarea { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; box-sizing: border-box; }
+        .city-selector { background: #555; border: none; color: white; padding: 5px; }
+        .cookie-banner { position: fixed; bottom: 0; width: 100%; background: #222; color: #fff; text-align: center; padding: 10px; display: none; }
+        .cookie-banner button { width: auto; margin-left: 10px; }
+        .spinner { display: none; width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Focus trap styles placeholder */
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <strong>A. Centauri Software</strong>
+            <select class="city-selector" id="citySelector">
+                <option value="IN-Pune">📍 Pune</option>
+                <option value="IN-Mumbai">📍 Mumbai</option>
+                <option value="IN-Delhi">📍 Delhi/NCR</option>
+            </select>
+        </div>
+        <div id="navAuth">
+            <a href="#" id="loginBtn">Log in</a>
+            <a href="/booking">Order delivery</a>
+            <a href="/tracking">Track Order</a>
+        </div>
+    </header>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeLogin">&times;</span>
+            <h2>Log In</h2>
+            <form id="loginForm">
+                <input type="text" id="loginUsername" placeholder="Email or Phone (10 digits)" required>
+                <span id="loginUsernameError" class="error"></span>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <span id="loginPasswordError" class="error"></span>
+                <button type="submit">Login</button>
+                <p>Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+                <div id="loginSpinner" class="spinner"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div id="signupModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeSignup">&times;</span>
+            <h2>Sign Up</h2>
+            <form id="signupForm">
+                <input type="text" id="signupName" placeholder="Full Name" required>
+                <input type="email" id="signupEmail" placeholder="Email" required>
+                <input type="text" id="signupPhone" placeholder="Phone Number (10 digits)" required>
+                <input type="password" id="signupPassword" placeholder="Password" required>
+                <div id="passwordStrength">Password Strength: <span>None</span></div>
+                <button type="submit">Sign Up</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cookie Banner -->
+    <div id="cookieBanner" class="cookie-banner">
+        This website uses cookies. <button id="acceptCookies">Accept</button>
+    </div>
+
+    <footer>
+        <hr>
+        <div class="container" style="text-align: center; font-size: 0.8em;">
+            <a href="#" target="_blank">FAQs</a> |
+            <a href="/history">History</a> |
+            <a href="/contact">Contacts</a> |
+            <a href="#" target="_blank">WebApp Blog</a> |
+            <a href="/courier-apply">Become a courier</a> |
+            <a href="/sales-inquiry">Contact sales</a>
+            <br>
+            <a href="#" target="_blank">Privacy Policy</a> |
+            <a href="#" target="_blank">Terms and conditions</a> |
+            <a href="#" target="_blank">Refund and Cancellation Policy</a> |
+            <a href="#" target="_blank">Disclaimers & Dispute Resolution</a>
+        </div>
+    </footer>
+
+    <script>
+        // City Selector persistence
+        const citySelector = document.getElementById('citySelector');
+        const storedCity = localStorage.getItem('xxx_user_city_preference');
+        if (storedCity) {
+            citySelector.value = storedCity;
+        }
+        citySelector.addEventListener('change', (e) => {
+            localStorage.setItem('xxx_user_city_preference', e.target.value);
+            location.reload();
+        });
+
+        // Modals logic
+        const loginModal = document.getElementById('loginModal');
+        const signupModal = document.getElementById('signupModal');
+
+        document.getElementById('loginBtn').onclick = () => loginModal.style.display = 'block';
+        document.getElementById('closeLogin').onclick = () => loginModal.style.display = 'none';
+
+        document.getElementById('showSignup').onclick = (e) => {
+            e.preventDefault();
+            loginModal.style.display = 'none';
+            signupModal.style.display = 'block';
+        };
+        document.getElementById('closeSignup').onclick = () => signupModal.style.display = 'none';
+
+        // Keyboard escape to close modals
+        window.onkeydown = function(event) {
+            if (event.key === "Escape") {
+                loginModal.style.display = "none";
+                signupModal.style.display = "none";
+            }
+        };
+
+        // Click outside to close modals
+        window.onclick = function(event) {
+            if (event.target == loginModal) loginModal.style.display = "none";
+            if (event.target == signupModal) signupModal.style.display = "none";
+        };
+
+        // Password strength feedback
+        const signupPassword = document.getElementById('signupPassword');
+        const passwordStrength = document.getElementById('passwordStrength').querySelector('span');
+        signupPassword.addEventListener('input', (e) => {
+            const val = e.target.value;
+            let strength = 'Weak';
+            if (val.length >= 8 && /[A-Z]/.test(val) && /[a-z]/.test(val) && /\d/.test(val)) {
+                strength = 'Strong';
+            } else if (val.length >= 6) {
+                strength = 'Medium';
+            }
+            passwordStrength.textContent = strength;
+        });
+
+        // Cookie banner
+        if (!localStorage.getItem('cookie_consent')) {
+            document.getElementById('cookieBanner').style.display = 'block';
+        }
+        document.getElementById('acceptCookies').onclick = () => {
+            localStorage.setItem('cookie_consent', 'true');
+            document.getElementById('cookieBanner').style.display = 'none';
+        };
+
+        // Login Logic
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            // Client side validation for phone format if purely numeric
+            if (/^\d+$/.test(username) && !/^\d{10}$/.test(username)) {
+                document.getElementById('loginUsernameError').textContent = 'Phone must be 10 digits';
+                return;
+            } else {
+                document.getElementById('loginUsernameError').textContent = '';
+            }
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('loginSpinner').style.display = 'block';
+                    setTimeout(() => {
+                        location.reload();
+                    }, 500); // Simulate loading
+                } else {
+                    const error = await res.json();
+                    document.getElementById('loginPasswordError').textContent = error.detail || 'Login failed';
+                }
+            } catch (err) {
+                document.getElementById('loginPasswordError').textContent = 'Connection failure';
+            }
+        });
+
+        // Signup Logic
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('signupName').value;
+            const email = document.getElementById('signupEmail').value;
+            const phone = document.getElementById('signupPhone').value;
+            const password = document.getElementById('signupPassword').value;
+
+            try {
+                const res = await fetch('/api/auth/signup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, email, phone, password})
+                });
+                if (res.ok) {
+                    alert('Signup successful, you can now log in.');
+                    signupModal.style.display = 'none';
+                    loginModal.style.display = 'block';
+                } else {
+                    const error = await res.json();
+                    alert(error.detail || 'Signup failed. Check your inputs.');
+                }
+            } catch (err) {
+                alert('Connection failure');
+            }
+        });
+    </script>
+</body>
+</html>
